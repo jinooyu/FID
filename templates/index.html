@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>FID信号分析工具</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .control-panel {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+        }
+        .parameter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        label {
+            font-weight: bold;
+            color: #333;
+        }
+        input, select {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .results-panel {
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+        }
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        .results-table th, .results-table td {
+            padding: 8px;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+        .results-table th {
+            background-color: #f0f0f0;
+        }
+        #plot {
+            margin-top: 20px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+        }
+        .method-comparison {
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+        }
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        .comparison-table th, .comparison-table td {
+            padding: 8px;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+        .comparison-table th {
+            background-color: #f0f0f0;
+        }
+        .analysis-summary {
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+        }
+        #summary-text {
+            resize: vertical;
+            min-height: 100px;
+        }
+        .additional-plots {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .plot-container {
+            background-color: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .plot-container h2 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>FID信号分析工具</h1>
+        
+        <div class="control-panel">
+            <div class="parameter-group">
+                <label for="freq">FID信号频率 (Hz):</label>
+                <input type="number" id="freq" value="2000" step="100">
+            </div>
+            
+            <div class="parameter-group">
+                <label for="A">信号振幅:</label>
+                <input type="number" id="A" value="1" step="0.1">
+            </div>
+            
+            <div class="parameter-group">
+                <label for="fs">采样率 (Hz):</label>
+                <input type="number" id="fs" value="20000" step="1000">
+            </div>
+            
+            <div class="parameter-group">
+                <label for="f_clock">时钟频率 (Hz):</label>
+                <input type="number" id="f_clock" value="50000000" step="1000000">
+            </div>
+            
+            <div class="parameter-group">
+                <label for="T2">T2时间 (s):</label>
+                <input type="number" id="T2" value="0.1" step="0.01">
+            </div>
+            
+            <div class="parameter-group">
+                <label for="T">信号持续时间 (s):</label>
+                <input type="number" id="T" value="0.5" step="0.1">
+            </div>
+            
+            <div class="parameter-group">
+                <label for="SNR">信噪比 (dB):</label>
+                <input type="number" id="SNR" value="20" step="1">
+            </div>
+            
+            <div class="parameter-group">
+                <label for="method">分析方法:</label>
+                <select id="method">
+                    <option value="平均法">平均法</option>
+                    <option value="25%平均法">25%平均法</option>
+                    <option value="最小二乘法">最小二乘法</option>
+                    <option value="二次拟合法">二次拟合法</option>
+                    <option value="多项式拟合法">多项式拟合法</option>
+                    <option value="神经网络法">神经网络法</option>
+                </select>
+            </div>
+            
+            <div class="parameter-group">
+                <label>&nbsp;</label>
+                <button onclick="analyze()">分析</button>
+                <button onclick="addToComparison()">添加到对比</button>
+                <button onclick="clearComparison()">清除对比</button>
+            </div>
+        </div>
+        
+        <div id="plot"></div>
+        
+        <div class="results-panel">
+            <h2>分析结果</h2>
+            <table class="results-table">
+                <tr>
+                    <th>参数</th>
+                    <th>值</th>
+                </tr>
+                <tr>
+                    <td>估计频率</td>
+                    <td id="estimated_freq">-</td>
+                </tr>
+                <tr>
+                    <td>相对误差</td>
+                    <td id="relative_error">-</td>
+                </tr>
+            </table>
+        </div>
+        
+        <div class="method-comparison">
+            <h2>方法对比</h2>
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>方法</th>
+                        <th>估计频率 (Hz)</th>
+                        <th>相对误差 (%)</th>
+                        <th>参数</th>
+                    </tr>
+                </thead>
+                <tbody id="comparison-body">
+                </tbody>
+            </table>
+        </div>
+
+        <div class="analysis-summary">
+            <h2>分析总结</h2>
+            <textarea id="summary-text" rows="6" style="width: 100%; padding: 10px; margin-top: 10px; border: 1px solid #ddd; border-radius: 4px; font-family: Arial, sans-serif;"></textarea>
+        </div>
+
+        <div class="additional-plots">
+            <div class="plot-container">
+                <h2>FID信号分析结果对比</h2>
+                <div id="fid-comparison-plot"></div>
+            </div>
+            <div class="plot-container">
+                <h2>时钟计数对比</h2>
+                <div id="clock-count-comparison-plot"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let comparisonData = [];
+        
+        function analyze() {
+            const data = {
+                freq: parseFloat(document.getElementById('freq').value),
+                A: parseFloat(document.getElementById('A').value),
+                fs: parseFloat(document.getElementById('fs').value),
+                f_clock: parseFloat(document.getElementById('f_clock').value),
+                T2: parseFloat(document.getElementById('T2').value),
+                T: parseFloat(document.getElementById('T').value),
+                SNR: parseFloat(document.getElementById('SNR').value),
+                method: document.getElementById('method').value
+            };
+            
+            fetch('/analyze', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.error) {
+                    alert(result.error);
+                    return;
+                }
+                
+                // 更新主图表
+                Plotly.newPlot('plot', result.plot_data.traces, result.plot_data.layout);
+                
+                // 更新结果
+                document.getElementById('estimated_freq').textContent = 
+                    result.results.estimated_frequency.toFixed(4) + ' Hz';
+                document.getElementById('relative_error').textContent = 
+                    result.results.relative_error.toFixed(4) + ' %';
+                
+                // 保存当前结果用于对比
+                comparisonData.push(result.results);
+                
+                // 更新对比图表
+                updateComparisonPlots();
+                
+                // 更新分析总结
+                updateSummary();
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('分析过程中发生错误');
+            });
+        }
+        
+        function updateComparisonPlots() {
+            if (comparisonData.length === 0) return;
+            
+            // FID信号分析结果对比图
+            const fidTraces = comparisonData.map((data, index) => ({
+                x: [data.parameters.freq],
+                y: [data.estimated_frequency],
+                name: data.parameters.method,
+                type: 'scatter',
+                mode: 'markers+text',
+                text: [`${data.relative_error.toFixed(2)}%`],
+                textposition: 'top center',
+                marker: { size: 10 }
+            }));
+            
+            const fidLayout = {
+                title: '频率估计对比',
+                xaxis: { title: '实际频率 (Hz)' },
+                yaxis: { title: '估计频率 (Hz)' },
+                showlegend: true,
+                height: 400,
+                margin: { t: 50, b: 50, l: 50, r: 50 }
+            };
+            
+            Plotly.newPlot('fid-comparison-plot', fidTraces, fidLayout);
+            
+            // 时钟计数对比图
+            const clockTraces = comparisonData.map((data, index) => ({
+                x: Array.from({length: data.clock_counts.length}, (_, i) => i + 1),
+                y: data.clock_counts,
+                name: data.parameters.method,
+                type: 'scatter',
+                mode: 'markers',
+                marker: { size: 6 }
+            }));
+            
+            const clockLayout = {
+                title: '时钟计数对比',
+                xaxis: { title: '周期序号' },
+                yaxis: { title: '时钟计数值' },
+                showlegend: true,
+                height: 400,
+                margin: { t: 50, b: 50, l: 50, r: 50 }
+            };
+            
+            Plotly.newPlot('clock-count-comparison-plot', clockTraces, clockLayout);
+        }
+        
+        function updateSummary() {
+            if (comparisonData.length === 0) return;
+            
+            const summary = [];
+            summary.push('分析总结：\n');
+            
+            // 计算最佳方法
+            const bestMethod = comparisonData.reduce((best, current) => 
+                Math.abs(current.relative_error) < Math.abs(best.relative_error) ? current : best
+            );
+            
+            summary.push(`1. 最佳估计方法：${bestMethod.parameters.method}`);
+            summary.push(`   估计频率：${bestMethod.estimated_frequency.toFixed(4)} Hz`);
+            summary.push(`   相对误差：${bestMethod.relative_error.toFixed(4)}%`);
+            
+            // 方法性能对比
+            summary.push('\n2. 方法性能对比：');
+            comparisonData.forEach(data => {
+                summary.push(`   ${data.parameters.method}：`);
+                summary.push(`     估计频率：${data.estimated_frequency.toFixed(4)} Hz`);
+                summary.push(`     相对误差：${data.relative_error.toFixed(4)}%`);
+            });
+            
+            // 参数影响分析
+            summary.push('\n3. 参数影响分析：');
+            const snrRange = Math.max(...comparisonData.map(d => d.parameters.SNR)) - 
+                            Math.min(...comparisonData.map(d => d.parameters.SNR));
+            if (snrRange > 0) {
+                summary.push(`   - 信噪比范围：${Math.min(...comparisonData.map(d => d.parameters.SNR))} dB 到 ${Math.max(...comparisonData.map(d => d.parameters.SNR))} dB`);
+            }
+            
+            // 添加时钟计数统计
+            summary.push('\n4. 时钟计数统计：');
+            comparisonData.forEach(data => {
+                const counts = data.clock_counts;
+                const mean = counts.reduce((a, b) => a + b, 0) / counts.length;
+                const std = Math.sqrt(counts.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / counts.length);
+                summary.push(`   ${data.parameters.method}：`);
+                summary.push(`     平均计数值：${mean.toFixed(2)}`);
+                summary.push(`     标准差：${std.toFixed(2)}`);
+            });
+            
+            document.getElementById('summary-text').value = summary.join('\n');
+        }
+        
+        function addToComparison() {
+            // 更新对比表格
+            const tbody = document.getElementById('comparison-body');
+            tbody.innerHTML = '';
+            
+            comparisonData.forEach(data => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${data.parameters.method}</td>
+                    <td>${data.estimated_frequency.toFixed(4)}</td>
+                    <td>${data.relative_error.toFixed(4)}</td>
+                    <td>f=${data.parameters.freq}Hz, SNR=${data.parameters.SNR}dB</td>
+                `;
+                tbody.appendChild(row);
+            });
+            
+            // 更新对比图表和总结
+            updateComparisonPlots();
+            updateSummary();
+        }
+        
+        function clearComparison() {
+            comparisonData = [];
+            document.getElementById('comparison-body').innerHTML = '';
+            document.getElementById('fid-comparison-plot').innerHTML = '';
+            document.getElementById('clock-count-comparison-plot').innerHTML = '';
+            document.getElementById('summary-text').value = '';
+        }
+    </script>
+</body>
+</html> 
